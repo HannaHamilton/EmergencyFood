@@ -1,0 +1,31 @@
+from openpyxl import load_workbook
+import json
+
+PARTNER_FILE = r'O:\PROGRAM PLANNING & SUPPORT- PP&S\EFD-VP CARES\DATA COLLECTION\partner list\EFD-VP Partner List - Living Document 12152021.xlsx'
+DATA_FILE_OUTPUT_PATH = r'O:/PROGRAM PLANNING & SUPPORT- PP&S/EFD-VP CARES/DATA COLLECTION/'
+
+nodes = []
+links = []
+workbook = load_workbook(PARTNER_FILE, data_only=True)
+partnerData = workbook['EFD_VP PARTNERS'].iter_rows(values_only=True)
+headers = next(partnerData)
+for row in partnerData:
+    id_vendor = row[0]
+    rowDict_vendor = {'id': id_vendor}
+    nodes.append(rowDict_vendor)
+    id_partner = row[1]
+    rowDict_partner = {'id': id_partner}
+    nodes.append(rowDict_partner)
+    rowDict_links = {'source':id_vendor, 'target':id_partner}
+    links.append(rowDict_links)
+
+nodesNoDup = []
+for node in range(len(nodes)):
+    if nodes[node] not in nodes[node + 1:]:
+        nodesNoDup.append(nodes[node])
+
+jsonDict = {'nodes':nodesNoDup, 'links':links}
+
+with open(f'{DATA_FILE_OUTPUT_PATH}EFDNetworkMapData_01082022.json', 'w') as outfile:
+    json.dump(jsonDict, outfile)
+    outfile.write('\n')
