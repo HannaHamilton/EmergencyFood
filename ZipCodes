@@ -1,0 +1,59 @@
+import csv
+from openpyxl import load_workbook
+from ZipCodeDicts import vendorNamesDict
+from ZipCodeDicts import zipToBOSDistrict
+
+
+BASE_FOLDER = r'O:/PROGRAM PLANNING & SUPPORT- PP&S/EFD-VP CARES/DATA COLLECTION/'
+fileName = r'EFD VP Data CIR_PROGRAM_BO_ZIP 12152021.xlsx'
+DATA_FILE_OUTPUT_PATH = r'O:/PROGRAM PLANNING & SUPPORT- PP&S/EFD-VP CARES/DATA COLLECTION/'
+
+workbook = load_workbook(BASE_FOLDER + fileName, data_only=True)
+print(workbook.sheetnames)
+
+def isHeaderFn(row):
+    valueCount = 0
+    for val in row:
+        if val is not None:
+            valueCount += 1
+        if valueCount == 2:
+            return True
+    return False
+
+def getMonthsCount(header):
+    for idx, val in enumerate(header[2:]):
+        if isinstance(val, str):
+            if 'total' in val.lower():
+                return idx
+    raise ValueError('No Total Column Found')
+
+def sumNone(monthsData):
+    totalVal = 0
+    for monthVal in monthsData:
+        # if not isinstance(monthVal, str):
+            totalVal += monthVal or 0
+    return totalVal
+
+vendorZipList = ['ACCFB zip', 'BACBO zip', 'BACH zip', 'CORUCC zip2', 'Common Vision', 'Community Kitchens', 'Deeply Rooted', 'DSAL zip', 'EC Reems', 'Eden United zip', 'Fare Resources zip', 'First Presbyterian zip2', 'J-Sei Inc. zip', 'KCCEB zip', 'Life ElderCare zip', ' Mandela Partners zip', ' OCCUR ', 'One Nation Dream Makers', 'Open Heart Kitchen zip', 'Preventative Care', '16. Revolution Foods (survey)', 'Salvation Army zip', 'SOS MOW zip', 'Spectrum zip', "St. Mary's Center zip", 'Trybe, Inc. zip', 'Unity Council zip', 'VACCEB zip']
+processedData = []
+for vendor in vendorZipList:
+    vendorZipData = workbook[vendor].iter_rows(values_only=True)
+    for row in vendorZipData:
+        if not isHeaderFn(row): #row is not a header if it has more than two cells that aren't empty
+            continue
+        headerRow = row #row is a header if two or less values aren't empty, break and use that as header
+        break
+    monthsCount = getMonthsCount(headerRow) #tells us the index we're on before Total
+    for row in vendorZipData:
+        # if not isHeaderFn(row):
+        monthsData = row[2:2+monthsCount] #selects the splice of row between column 2 and index before total
+        total = sumNone(monthsData) #sums the splice and inserts zero where empty cells are
+        currentDict = {'zip': row[0], 'city': row[1], 'vendor': vendorNamesDict.get(vendor), 'clientCount': total, 'BOS_District':f'District {zipToBOSDistrict.get(row[0])}'}
+        processedData.append(currentDict)
+
+headersToWrite = processedData[0].keys()
+
+with open(f'{DATA_FILE_OUTPUT_PATH}PROCESSED_ZIPS_112021.csv', 'w', newline='') as csvfile:
+    writer = csv.DictWriter(csvfile, fieldnames=headersToWrite)
+    writer.writeheader()
+    writer.writerows(processedData)
