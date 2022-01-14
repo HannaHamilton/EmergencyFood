@@ -1,0 +1,45 @@
+import csv
+from openpyxl import load_workbook, Workbook
+from dateutil.parser import parse
+from HeaderDictionary import headerNames
+
+BASE_FOLDER = r'O:/PROGRAM PLANNING & SUPPORT- PP&S/EFD-VP CARES/DATA COLLECTION/OLD/'
+fileName = r'EFD VP  Data HOUSE_AGE_RACE 09172021.xlsx'
+DATA_FILE_OUTPUT_PATH = r'O:/PROGRAM PLANNING & SUPPORT- PP&S/EFD-VP CARES/DATA COLLECTION/'
+
+
+def getMonthDate(monthName):
+    if not monthName:
+        return
+    monthDate = parse(monthName)
+    if monthDate.month >= 9:
+        monthDate = monthDate.replace(year=monthDate.year - 1)
+    return monthDate.replace(day=1).date()
+
+workbook = load_workbook(BASE_FOLDER + fileName, data_only=True)  # workbook refers to entire Excel document with multiple sheets
+vendorList = ['ACCFB', 'BACBO', 'BACH', 'CORUCC', 'Common Vision', 'Community Kitchens', 'Deeply Rooted', 'DSAL', 'EC Reems', 'EDEN ', 'Fare Resources', 'FIRST PRESB', 'J-SEI', 'KCCEB', 'Life ElderCare', 'Mandela', 'OCCUR', 'ONDM', 'Open Heart', 'Preventative Care', 'REVOL FOODS', 'Salvation Army', 'SOS MOW', 'Spectrum', 'St Marys', 'TRYBE', 'Unity Council', 'VACCEB']
+processedData = {}
+headers = None
+for vendor in vendorList:
+    vendorData = workbook[vendor].iter_rows(min_row=1, max_row=60, min_col=1, max_col=13, values_only=True)
+    headers = next(vendorData)
+    months = list(headers[2:])
+    for idx, month in enumerate(months):
+        months[idx] = getMonthDate(month)
+    for row in vendorData:
+        for idx, month in enumerate(months):
+            currentDict = processedData.get((vendor, month), None)  # first look up vendor, month in processedData - if not there, than None
+            if not currentDict:  # if vendor, month is None then create a new currentDict
+                currentDict = {'vendor': vendor, 'date': month}  # currentDict has vendor and month from enumerate(months)
+                processedData[vendor, month] = currentDict  # processedData key with headers vendor, month for that row is whatever currentDict is
+            metricName = headerNames.get(row[0])
+            currentDict[metricName] = row[idx + 2] # metric equals value in idx+2
+
+revisedHeaders = list(list(processedData.values())[0].keys())
+print(revisedHeaders)
+
+with open(f'{DATA_FILE_OUTPUT_PATH}PROCESSED_HOUSE_AGE_RACE_082021.csv', 'w', newline='') as csvfile:
+    csvWriter = csv.DictWriter(csvfile, fieldnames=revisedHeaders)
+    csvWriter.writeheader()
+    for record in processedData.values():
+        csvWriter.writerow(record)
