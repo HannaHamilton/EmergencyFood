@@ -1,0 +1,76 @@
+from openpyxl import load_workbook
+import glob
+from HeaderDictionary import surveyMetrics
+import re
+import csv
+
+BASE_FOLDER = r'O:\PROGRAM PLANNING & SUPPORT- PP&S\EFD-VP CARES\INVOICE and Monthly Reports\#Invoice-Reports by Month'
+subFolder = r'\12-December 2021\*.xlsx'
+DATA_FILE_OUTPUT_PATH = r'O:/PROGRAM PLANNING & SUPPORT- PP&S/EFD-VP CARES/DATA COLLECTION/'
+
+def getFormattedMetric(val):
+    if val is None:
+        return val
+    regExPattern = '([0-9a-z]{0,5}\.)?\w.*?(?P<metric>\S?.*)'
+    formattedMetric = re.match(regExPattern, val.lower().strip())
+    if formattedMetric is None:
+        print(f'could not format {val}')
+        return None
+    return formattedMetric.group('metric')
+
+processedData = {}
+for fileName in glob.iglob(BASE_FOLDER + subFolder):
+    workbook = load_workbook(fileName, data_only = True)
+    surveyData = workbook['EFD-VP Monthly Report'].iter_rows(values_only = True)
+    rowNum = 0
+    for row in surveyData:
+        rowNum += 1
+        for idx, val in enumerate(row):
+            if isinstance(val, str):
+                if 'name of contractor:  ' in val.lower():
+                    vendor = row[idx + 1]
+                if 'report month:  ' in val.lower():
+                    date = row[idx + 1]
+                    vendorData = processedData.get((vendor, date), None)
+                    if not vendorData:  # if vendor, month is None then create a new currentDict
+                        vendorData = {'vendor': vendor, 'date': date}
+                        processedData[vendor, date] = vendorData
+        if isinstance(row[0], str) and 'food distribution outcomes' in row[0].lower():
+                break
+
+    metricErrors = []
+    metricNames = set()
+    for row in surveyData:
+        rowNum += 1
+        metricName = getFormattedMetric(row[0])
+        metricNames.add(metricName)
+        if metricName is None:
+            metricErrors.append((fileName, rowNum, row[0]))
+        if metricName is not None:
+            metricHeader = surveyMetrics.get(metricName)
+            if metricHeader is not None:
+                vendorData[metricHeader] = row[3]
+        if isinstance(row[0], str) and ".\xa0\xa0\xa0\xa0\xa0 household zip codes                                                                                refer to zip codes tab in report                                                        'efd-vp monthly report zip code'" in row[0].lower():
+            break
+
+    nextMetricErrors = []
+    nextMetricNames = set()
+    for row in surveyData:
+        rowNum += 1
+        nextMetricName = getFormattedMetric(row[0])
+        nextMetricNames.add(nextMetricName)
+        if nextMetricName is None:
+            nextMetricErrors.append((fileName, rowNum, row[0]))
+            continue
+        if nextMetricName is not None:
+            nextMetricHeader = surveyMetrics.get(nextMetricName)
+            if nextMetricHeader is not None:
+                vendorData[nextMetricHeader] = row[2]
+
+headersToWrite = list(list(processedData.values())[0].keys())
+
+with open(f'{DATA_FILE_OUTPUT_PATH}PROCESSED_SURVEYDATA_122021.csv', 'w', newline='') as csvfile:
+    csvWriter = csv.DictWriter(csvfile, fieldnames=headersToWrite)
+    csvWriter.writeheader()
+    for record in processedData.values():
+        csvWriter.writerow(record)
