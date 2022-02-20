@@ -1,0 +1,70 @@
+from openpyxl import load_workbook
+import glob
+import csv
+from fuzzywuzzy import fuzz
+
+
+BASE_FOLDER = r'O:\PROGRAM PLANNING & SUPPORT- PP&S\EFD-VP CARES\INVOICE and Monthly Reports\#Invoice-Reports by Month'
+subFolder_Name = r'\11-November 2021\*.xlsx'
+GOALS_FILE = r'O:\PROGRAM PLANNING & SUPPORT- PP&S\EFD-VP CARES\DATA COLLECTION\Dashboard Data\Monthly meal and household goals.xlsx'
+DATA_FILE_OUTPUT_PATH = r'O:/PROGRAM PLANNING & SUPPORT- PP&S/EFD-VP CARES/DATA COLLECTION/'
+
+
+goalsWorkbook = load_workbook(GOALS_FILE, data_only=True)
+goalsData = goalsWorkbook['Vendor Goals'].iter_rows(values_only=True)
+goals = {}
+headers = next(goalsData)
+for row in goalsData:
+    goals[row[0]] = row
+
+def getBestGoalsMatch(contractorName, goals):
+    bestNameMatch = None
+    bestScore = 0
+    for goalName in goals:
+        matchScore = fuzz.ratio(contractorName, goalName)
+        if matchScore >= bestScore:
+            bestScore = matchScore
+            bestNameMatch = goalName
+    if bestNameMatch is None:
+        return None
+    return goals[bestNameMatch]
+
+processedData = []
+for fileName in glob.glob(BASE_FOLDER + subFolder_Name):
+    workbook = load_workbook(fileName, data_only=True)
+    mealData = workbook['Invoice'].iter_rows(values_only=True)
+    for row in mealData:
+        for idx, val in enumerate(row):
+            if isinstance(val, str):
+                if 'contractor' in val.lower():
+                    contractorName: object = row[idx + 1]
+                    contractorGoals = list(getBestGoalsMatch(contractorName, goals))
+                if 'time period' in val.lower():
+                    date = row[idx + 1]
+                if '# of prepared meals' in val.lower():
+                    preparedMeals = row[idx + 1]
+                if '# of meal equivalents (=pounds/1.2) distributed ' in val.lower():
+                    mealEqs = row[idx + 1]
+    surveyData = workbook['EFD-VP Monthly Report'].iter_rows(values_only=True)
+    for row in surveyData:
+        for idx, val in enumerate(row):
+            if isinstance(val, str):
+                if 'unduplicated households served in the month' in val.lower():
+                    householdsServed = row[idx + 3]
+
+currentDict = {'Vendor': contractorGoals[0], 'Date': date, 'Prepared Meals': preparedMeals,
+                   'Meal Eqs': mealEqs, 'Household Served': householdsServed, 'Monthly Goal_MealEq': contractorGoals[2],
+                   'Monthly Goal_undup indiv': contractorGoals[3], 'Monthly Goal_undup households': contractorGoals[4]}
+processedData.append(currentDict)
+
+contractorList = []
+for record in processedData:
+    contractorList.append(record['vendor'])
+
+headersToWrite = list(processedData[0].keys())
+print(headersToWrite)
+
+with open(f'{DATA_FILE_OUTPUT_PATH}PROCESSED_MEALS_122021_test2.csv', 'w', newline='') as csvfile:
+    writer = csv.DictWriter(csvfile, headersToWrite)
+    writer.writeheader()
+    writer.writerows(processedData)
