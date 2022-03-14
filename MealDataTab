@@ -52,14 +52,10 @@ for fileName in glob.glob(BASE_FOLDER + subFolder_Name):
                 if 'unduplicated households served in the month' in val.lower():
                     householdsServed = row[idx + 3]
 
-currentDict = {'Vendor': contractorGoals[0], 'Date': date, 'Prepared Meals': preparedMeals,
+    currentDict = {'Vendor': contractorGoals[0], 'Date': date, 'Prepared Meals': preparedMeals,
                    'Meal Eqs': mealEqs, 'Household Served': householdsServed, 'Monthly Goal_MealEq': contractorGoals[2],
                    'Monthly Goal_undup indiv': contractorGoals[3], 'Monthly Goal_undup households': contractorGoals[4]}
-processedData.append(currentDict)
-
-contractorList = []
-for record in processedData:
-    contractorList.append(record['vendor'])
+    processedData.append(currentDict)
 
 headersToWrite = list(processedData[0].keys())
 print(headersToWrite)
